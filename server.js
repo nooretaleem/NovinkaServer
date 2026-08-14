@@ -19,14 +19,37 @@ const prisma = new PrismaClient();
 // Security
 app.use(helmet());
 app.use(compression());
+const allowedOrigins = [
+    'http://localhost:4200',
+    'https://novinka-admin.vercel.app',
+    'https://novinkaconstructions.com',
+    'https://www.novinkaconstructions.com',
+    'https://www.novinkaconstructions.netlify.app',
+    'https://novinka-client.vercel.app'
+];
 
 // CORS
 app.use(cors({
+    origin: function (origin, callback) {
+        // Allow Postman/server-to-server requests (no Origin header)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+
+        return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+/* app.use(cors({
     origin: process.env.FRONTEND_URL || 'http://localhost:4200',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization']
-}));
+})); */
 
 // Rate Limiting
 const limiter = rateLimit({
