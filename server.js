@@ -72,6 +72,16 @@ app.use('/api/blogs', blogRoutes);
 app.use('/api/notifications', notificationRoutes.router);
 app.use('/api/quotes', quoteRoutes);
 app.use('/api/messages', messageRoutes);
+
+app.get('/', (req, res) => {
+    res.json({
+        success: true,
+        name: 'NOVINKA API',
+        version: '1.0.0',
+        health: '/api/health'
+    });
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({
