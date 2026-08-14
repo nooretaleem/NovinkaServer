@@ -173,7 +173,7 @@ router.get('/quotes/count', authMiddleware, async (req, res) => {
 
 router.get('/messages/count', authMiddleware, async (req, res) => {
     try {
-        const count = await prisma.message.count();
+        const count = await prisma.message.count({ where: { status: 'UNREAD' } });
         res.status(200).json({ status: 'success', data: { count } });
     } catch (error) {
         res.status(200).json({ status: 'success', data: { count: 0 } });

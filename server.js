@@ -25,7 +25,10 @@ const allowedOrigins = [
     'https://novinkaconstructions.com',
     'https://www.novinkaconstructions.com',
     'https://www.novinkaconstructions.netlify.app',
-    'https://novinka-client.vercel.app'
+    'https://novinka-client.vercel.app',
+    'http://localhost:4200',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500'
 ];
 
 // CORS

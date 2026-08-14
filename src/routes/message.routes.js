@@ -7,6 +7,74 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 // ============================================
+// CREATE MESSAGE (Public Endpoint)
+// ============================================
+router.post('/', async (req, res) => {
+    try {
+        const { name, email, phone, subject, message } = req.body;
+
+        if (!name || !name.trim()) {
+            return res.status(400).json({ status: 'error', message: 'Name is required' });
+        }
+        if (!email || !email.trim()) {
+            return res.status(400).json({ status: 'error', message: 'Email address is required' });
+        }
+        if (!message || !message.trim()) {
+            return res.status(400).json({ status: 'error', message: 'Message is required' });
+        }
+
+        const newMessage = await prisma.message.create({
+            data: {
+                name: name.trim(),
+                email: email.trim().toLowerCase(),
+                phone: phone ? phone.trim() : null,
+                subject: (subject && subject.trim()) ? subject.trim() : 'General Inquiry',
+                message: message.trim(),
+                status: 'UNREAD'
+            }
+        });
+
+        // Automatically create admin notification in the database
+        try {
+            const systemUsers = await prisma.user.findMany({
+                select: { id: true }
+            });
+
+            if (systemUsers && systemUsers.length > 0) {
+                const notificationsData = systemUsers.map(u => ({
+                    userId: u.id,
+                    type: 'MESSAGE',
+                    title: 'New Contact Message',
+                    message: `${newMessage.name} sent a new enquiry regarding "${newMessage.subject}"`,
+                    icon: 'fa-envelope',
+                    link: '/messages',
+                    isRead: false
+                }));
+
+                await prisma.notification.createMany({
+                    data: notificationsData
+                });
+            }
+        } catch (notifError) {
+            console.error('Failed to create notification for new message:', notifError);
+            // Non-blocking for client message submission response
+        }
+
+        res.status(201).json({
+            status: 'success',
+            message: 'Your message has been sent successfully!',
+            data: { message: newMessage }
+        });
+    } catch (error) {
+        console.error('Failed to create message:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to send message. Please try again.'
+        });
+    }
+});
+
+// ============================================
 // GET ALL MESSAGES
 // ============================================
 router.get('/', authMiddleware, async (req, res) => {
