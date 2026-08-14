@@ -1,0 +1,289 @@
+// ============================================
+// PRISMA SCHEMA - NOVINKA CONSTRUCTIONS
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+   url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USERS
+// ============================================
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  password     String
+  role         UserRole @default(STAFF)
+  avatar       String?
+  lastLogin    DateTime?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+// ============================================
+// PROJECTS
+// ============================================
+
+model Project {
+  id                  String    @id @default(cuid())
+
+  title               String
+  location            String
+  projectType         String
+  description         String?
+
+  coverImage String? @db.Text
+  coverImagePublicId  String?   @db.VarChar(255) // <-- ADD THIS
+
+  gallery             Json?      @default("[]")
+
+  completionDate      DateTime?
+  isFeatured          Boolean    @default(false)
+  displayOrder        Int        @default(0)
+
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@map("projects")
+}
+
+// ============================================
+// SERVICES
+// ============================================
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  icon        String
+  image       String?
+  imagePublicId String? // ADD THIS FIELD
+  description String
+  features    Json?    @default("[]")
+  displayOrder Int     @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("services")
+}
+// ============================================
+// BLOGS
+// ============================================
+model Blog {
+  id            String   @id @default(cuid())
+  title         String
+  slug          String   @unique
+  excerpt       String?
+  content       String
+  featuredImage String? @db.Text
+  featuredImagePublicId String? @db.VarChar(255)
+  categories    Json?    @default("[]")  // FIXED: Use string JSON
+  seoTitle      String?
+  seoDescription String?
+  viewCount     Int      @default(0)
+  isPublished   Boolean  @default(false)
+  publishedAt   DateTime?
+  authorId      String
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("blogs")
+}
+
+// ============================================
+// QUOTE REQUESTS
+// ============================================
+model Quote {
+  id            String     @id @default(cuid())
+  customerName  String
+  email         String
+  phone         String
+  city          String
+  projectType   String     // Grey Structure, Finished Home
+  contractType  String     // With Material, %age Basis, Consultancy
+  plotSize      Float
+  coveredArea   Float
+  estimatedCost Float?
+  status        QuoteStatus @default(NEW)
+  message       String?
+  adminNotes    String?    // Internal notes for admin
+  quotedAmount  Float?     // Admin's quoted amount
+  quotationSent Boolean    @default(false)
+  quotationSentAt DateTime?
+  viewedAt      DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@map("quotes")
+}
+
+enum QuoteStatus {
+  NEW           // New request
+  REVIEWING     // Admin is reviewing
+  QUOTED        // Quotation sent to customer
+  APPROVED      // Customer approved
+  REJECTED      // Customer rejected
+}
+
+// ============================================
+// MESSAGES
+// ============================================
+model Message {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  subject     String
+  message     String
+  status      MessageStatus @default(UNREAD)
+  isArchived  Boolean  @default(false)
+  userId      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("messages")
+}
+
+enum MessageStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+// ============================================
+// TESTIMONIALS
+// ============================================
+model Testimonial {
+  id          String   @id @default(cuid())
+  clientName  String
+  clientImage String?
+  review      String
+  rating      Int      @default(5)
+  isActive    Boolean  @default(true)
+  displayOrder Int     @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("testimonials")
+}
+
+// ============================================
+// FAQS
+// ============================================
+model FAQ {
+  id          String   @id @default(cuid())
+  question    String
+  answer      String
+  category    String?  @default("General")
+  displayOrder Int     @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("faqs")
+}
+
+// ============================================
+// HOMEPAGE SECTIONS
+// ============================================
+model Homepage {
+  id          String   @id @default(cuid())
+  section     HomepageSection
+  title       String?
+  content     Json?    // Changed from Json? to Json? (removed default)
+  isActive    Boolean  @default(true)
+  displayOrder Int     @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([section])
+  @@map("homepage")
+}
+
+enum HomepageSection {
+  HERO_CAROUSEL
+  STATISTICS
+  WHY_CHOOSE_US
+  TESTIMONIALS
+  PARTNERS
+  CTA_SECTION
+}
+
+// ============================================
+// MEDIA
+// ============================================
+model Media {
+  id          String   @id @default(cuid())
+  filename    String
+  originalName String
+  url         String
+  publicId    String
+  alt         String?
+  size        Int
+  mimeType    String
+  width       Int?
+  height      Int?
+  uploadedBy  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("media")
+}
+
+// ============================================
+// SETTINGS
+// ============================================
+model Setting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       Json
+  category    String   @default("general")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("settings")
+}
+
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  icon      String?
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  QUOTE
+  MESSAGE
+  BLOG
+  SYSTEM
+}

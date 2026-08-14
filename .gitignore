@@ -1,0 +1,109 @@
+# =========================
+# Dependencies
+# =========================
+node_modules/
+
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Logs
+# =========================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Runtime Files
+# =========================
+pids/
+*.pid
+*.pid.lock
+
+# =========================
+# Temporary Files
+# =========================
+tmp/
+temp/
+.cache/
+
+# =========================
+# Build Output
+# =========================
+dist/
+build/
+coverage/
+
+# =========================
+# Prisma
+# =========================
+prisma/dev.db
+prisma/dev.db-journal
+prisma/*.db
+prisma/*.db-journal
+
+# Prisma generated client (ignore only if generated during install)
+# prisma/generated/
+
+# =========================
+# File Uploads
+# =========================
+uploads/
+public/uploads/
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# IDE & Editors
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# Test Coverage
+# =========================
+.nyc_output/
+coverage/
+
+# =========================
+# ESLint Cache
+# =========================
+.eslintcache
+
+# =========================
+# Package Managers
+# =========================
+.pnpm-store/
+.npm/
+
+# =========================
+# Optional Lock Files
+# (Keep the one you use)
+# =========================
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# =========================
+# Docker
+# =========================
+.dockerignore
+
+# =========================
+# Misc
+# =========================
+*.tgz
+*.gz
