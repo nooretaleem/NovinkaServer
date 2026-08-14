@@ -22,7 +22,7 @@ app.use(compression());
 const allowedOrigins = [
     'http://localhost:4200',
     'https://novinka-admin.vercel.app',
-    'https://novinkaconstructions.netlify.app/',
+    'https://novinkaconstructions.netlify.app',
     'https://novinkaconstructions.com',
     'https://www.novinkaconstructions.com',
     'https://www.novinkaconstructions.netlify.app',
