@@ -119,12 +119,20 @@ model Quote {
   plotSize      Float
   coveredArea   Float
   estimatedCost Float?
+  estimatorDetails Json?
   status        QuoteStatus @default(NEW)
   message       String?
   adminNotes    String?    // Internal notes for admin
   quotedAmount  Float?     // Admin's quoted amount
   quotationSent Boolean    @default(false)
   quotationSentAt DateTime?
+  customerAccessToken String? @unique
+  customerAccessTokenCreatedAt DateTime?
+  customerAccessTokenExpiresAt DateTime?
+  customerAccessTokenRevoked Boolean @default(false)
+  customerResponse String?
+  customerResponseAt DateTime?
+  customerRejectionReason String?
   viewedAt      DateTime?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
