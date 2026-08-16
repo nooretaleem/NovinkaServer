@@ -17,8 +17,11 @@ const prisma = new PrismaClient();
 // ============================================
 
 // Security
-app.use(helmet());
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(compression());
+
 const allowedOrigins = [
     'http://localhost:4200',
     'http://localhost:5500',
@@ -30,28 +33,36 @@ const allowedOrigins = [
     'https://www.novinkaconstructions.netlify.app',
     'https://novinka-client.vercel.app'
 ];
-// CORS
-app.use(cors({
+
+if (process.env.PUBLIC_SITE_URL) {
+    const pubUrl = process.env.PUBLIC_SITE_URL.trim().replace(/\/$/, '');
+    if (pubUrl && !allowedOrigins.includes(pubUrl)) allowedOrigins.push(pubUrl);
+}
+if (process.env.FRONTEND_URL) {
+    const frontUrl = process.env.FRONTEND_URL.trim().replace(/\/$/, '');
+    if (frontUrl && !allowedOrigins.includes(frontUrl)) allowedOrigins.push(frontUrl);
+}
+
+const corsOptions = {
     origin: function (origin, callback) {
-        // Allow Postman/server-to-server requests (no Origin header)
+        // Allow server-to-server / Postman requests (no Origin header)
         if (!origin) return callback(null, true);
 
         if (allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
 
-        return callback(new Error(`CORS blocked for origin: ${origin}`));
+        return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
-/* app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:4200',
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-})); */
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    optionsSuccessStatus: 200
+};
+
+// CORS Middleware & OPTIONS Preflight
+app.use(cors(corsOptions));
+//app.options('*', cors(corsOptions));
 
 // Rate Limiting
 const limiter = rateLimit({
@@ -154,3 +165,5 @@ process.on('SIGINT', async () => {
     await prisma.$disconnect();
     process.exit(0);
 });
+
+module.exports = app;
