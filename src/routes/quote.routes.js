@@ -304,125 +304,190 @@ function generateQuotePdfBuffer(quote) {
     return new Promise((resolve, reject) => {
         try {
             const chunks = [];
-            const doc = new PDFDocument({ margin: 40, size: 'A4' });
+            const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
 
             doc.on('data', chunk => chunks.push(chunk));
             doc.on('end', () => resolve(Buffer.concat(chunks)));
             doc.on('error', reject);
 
-            const id = quote.id;
+            const id = quote.id || 'N/A';
+            const pageHeight = 841.89;
+            const marginBottom = 50;
+            const contentWidth = 515;
+            const startX = 40;
+
+            function checkPageBreak(neededHeight) {
+                if (doc.y + neededHeight > pageHeight - marginBottom) {
+                    doc.addPage();
+                    doc.y = 40;
+                }
+            }
+
+            function drawSectionHeader(title) {
+                checkPageBreak(30);
+                doc.fillColor('#0073E6').fontSize(11).font('Helvetica-Bold').text(title.toUpperCase(), startX, doc.y);
+                doc.moveDown(0.2);
+                doc.moveTo(startX, doc.y).lineTo(startX + contentWidth, doc.y).strokeColor('#E2E8F0').lineWidth(1).stroke();
+                doc.moveDown(0.4);
+            }
+
+            function drawGridRows(rows) {
+                const colWidth = contentWidth / 2;
+                for (const row of rows) {
+                    checkPageBreak(16);
+                    const currentY = doc.y;
+
+                    if (row[0]) {
+                        doc.fillColor('#333333').fontSize(9.5);
+                        doc.font('Helvetica-Bold').text(row[0].label + ': ', startX, currentY, { continued: true });
+                        doc.font('Helvetica').text(row[0].value || 'N/A', { width: colWidth - 10 });
+                    }
+
+                    if (row[1]) {
+                        doc.fillColor('#333333').fontSize(9.5);
+                        doc.font('Helvetica-Bold').text(row[1].label + ': ', startX + colWidth, currentY, { continued: true });
+                        doc.font('Helvetica').text(row[1].value || 'N/A', { width: colWidth - 10 });
+                    }
+
+                    doc.y = Math.max(doc.y, currentY + 14);
+                }
+            }
 
             // --- BRANDING & HEADER ---
-            doc.fillColor('#0073E6').fontSize(22).font('Helvetica-Bold').text('NOVINKA CONSTRUCTIONS', { align: 'left' });
-            doc.fillColor('#6B7A8C').fontSize(10).font('Helvetica').text('Engineering & Construction Services', { align: 'left' });
-            doc.moveDown(0.5);
+            doc.fillColor('#0073E6').fontSize(20).font('Helvetica-Bold').text('NOVINKA CONSTRUCTIONS', startX, 40);
+            doc.fillColor('#6B7A8C').fontSize(9).font('Helvetica').text('Engineering & Construction Services', startX, doc.y);
+            doc.moveDown(0.4);
 
-            // Header Line
-            doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#0073E6').lineWidth(2).stroke();
-            doc.moveDown(1);
+            doc.moveTo(startX, doc.y).lineTo(startX + contentWidth, doc.y).strokeColor('#0073E6').lineWidth(1.5).stroke();
+            doc.moveDown(0.6);
 
-            // Document Title
-            doc.fillColor('#1A3A5C').fontSize(15).font('Helvetica-Bold').text('OFFICIAL CONSTRUCTION QUOTATION', { align: 'center' });
-            doc.moveDown(0.8);
-
-            // Reference & Date Info
+            // Reference & Metadata Row
             const quoteDate = quote.createdAt ? new Date(quote.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : new Date().toLocaleDateString('en-US');
-            doc.fillColor('#333333').fontSize(10);
-            doc.font('Helvetica-Bold').text('Quotation Ref: ', { continued: true }).font('Helvetica').text(`NOV-QUOTE-${id}`);
-            doc.font('Helvetica-Bold').text('Date: ', { continued: true }).font('Helvetica').text(quoteDate);
-            doc.font('Helvetica-Bold').text('Status: ', { continued: true }).font('Helvetica').text(quote.status || 'NEW');
-            doc.moveDown(1);
+
+            drawGridRows([
+                [ { label: 'Quotation Ref', value: `NOV-QUOTE-${id}` }, { label: 'Date', value: quoteDate } ],
+                [ { label: 'Status', value: quote.status || 'NEW' }, { label: 'Currency', value: 'PKR' } ]
+            ]);
+            doc.moveDown(0.6);
 
             // --- CUSTOMER INFORMATION ---
-            doc.fillColor('#0073E6').fontSize(12).font('Helvetica-Bold').text('CUSTOMER INFORMATION');
-            doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#E2E8F0').lineWidth(1).stroke();
-            doc.moveDown(0.5);
-
-            doc.fillColor('#333333').fontSize(10);
-            doc.font('Helvetica-Bold').text('Customer Name: ', { continued: true }).font('Helvetica').text(quote.customerName || 'N/A');
-            doc.font('Helvetica-Bold').text('Email Address: ', { continued: true }).font('Helvetica').text(quote.email || 'N/A');
-            doc.font('Helvetica-Bold').text('Phone Number: ', { continued: true }).font('Helvetica').text(quote.phone || 'N/A');
-            doc.font('Helvetica-Bold').text('City / Location: ', { continued: true }).font('Helvetica').text(quote.city || 'N/A');
-            doc.moveDown(1);
+            drawSectionHeader('Customer Information');
+            drawGridRows([
+                [ { label: 'Customer Name', value: quote.customerName }, { label: 'Email Address', value: quote.email } ],
+                [ { label: 'Phone Number', value: quote.phone }, { label: 'City / Location', value: quote.city } ]
+            ]);
+            doc.moveDown(0.6);
 
             // --- PROJECT SPECIFICATIONS ---
-            doc.fillColor('#0073E6').fontSize(12).font('Helvetica-Bold').text('PROJECT SPECIFICATIONS');
-            doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#E2E8F0').lineWidth(1).stroke();
-            doc.moveDown(0.5);
-
-            doc.fillColor('#333333').fontSize(10);
-            doc.font('Helvetica-Bold').text('Project Type: ', { continued: true }).font('Helvetica').text(quote.projectType || 'N/A');
-            doc.font('Helvetica-Bold').text('Contract Type: ', { continued: true }).font('Helvetica').text(quote.contractType || 'N/A');
-            doc.font('Helvetica-Bold').text('Plot Size: ', { continued: true }).font('Helvetica').text(quote.plotSize ? `${quote.plotSize} sq. ft.` : 'N/A');
-            doc.font('Helvetica-Bold').text('Covered Area: ', { continued: true }).font('Helvetica').text(quote.coveredArea ? `${quote.coveredArea} sq. ft.` : 'N/A');
-            doc.moveDown(1);
+            drawSectionHeader('Project Specifications');
+            drawGridRows([
+                [ { label: 'Project Type', value: quote.projectType }, { label: 'Contract Type', value: quote.contractType } ],
+                [ { label: 'Plot Size', value: quote.plotSize ? `${quote.plotSize} sq. ft.` : 'N/A' }, { label: 'Covered Area', value: quote.coveredArea ? `${quote.coveredArea} sq. ft.` : 'N/A' } ]
+            ]);
+            doc.moveDown(0.6);
 
             // --- ESTIMATOR BREAKDOWN ---
             const details = quote.estimatorDetails;
-            if (details && typeof details === 'object') {
-                doc.fillColor('#0073E6').fontSize(12).font('Helvetica-Bold').text('ESTIMATOR BREAKDOWN & SCOPE');
-                doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#E2E8F0').lineWidth(1).stroke();
-                doc.moveDown(0.5);
+            if (details && typeof details === 'object' && Object.keys(details).length > 0) {
+                drawSectionHeader('Estimator Breakdown & Scope');
+                const estItems = [];
+                if (details.floors !== undefined) estItems.push({ label: 'Floors', value: String(details.floors) });
+                if (details.bedrooms !== undefined) estItems.push({ label: 'Bedrooms', value: String(details.bedrooms) });
+                if (details.bathrooms !== undefined) estItems.push({ label: 'Bathrooms', value: String(details.bathrooms) });
+                if (details.kitchens !== undefined) estItems.push({ label: 'Kitchens', value: String(details.kitchens) });
+                if (details.drawingRoom !== undefined) estItems.push({ label: 'Drawing Room', value: details.drawingRoom ? 'Included' : 'None' });
+                if (details.tvLounge !== undefined) estItems.push({ label: 'TV Lounge', value: details.tvLounge ? 'Included' : 'None' });
+                if (details.carPorch !== undefined) estItems.push({ label: 'Car Porch', value: details.carPorch ? 'Included' : 'None' });
+                if (details.basement !== undefined) estItems.push({ label: 'Basement', value: details.basement ? 'Included' : 'None' });
+                if (details.materialQuality) estItems.push({ label: 'Material Quality', value: String(details.materialQuality) });
+                if (details.timeline) estItems.push({ label: 'Estimated Duration', value: `${details.timeline} months` });
 
-                doc.fillColor('#333333').fontSize(10);
-                if (details.floors !== undefined) doc.font('Helvetica-Bold').text('Floors: ', { continued: true }).font('Helvetica').text(String(details.floors));
-                if (details.bedrooms !== undefined) doc.font('Helvetica-Bold').text('Bedrooms: ', { continued: true }).font('Helvetica').text(String(details.bedrooms));
-                if (details.bathrooms !== undefined) doc.font('Helvetica-Bold').text('Bathrooms: ', { continued: true }).font('Helvetica').text(String(details.bathrooms));
-                if (details.kitchens !== undefined) doc.font('Helvetica-Bold').text('Kitchens: ', { continued: true }).font('Helvetica').text(String(details.kitchens));
-                if (details.drawingRoom !== undefined) doc.font('Helvetica-Bold').text('Drawing Room: ', { continued: true }).font('Helvetica').text(details.drawingRoom ? 'Included' : 'None');
-                if (details.tvLounge !== undefined) doc.font('Helvetica-Bold').text('TV Lounge: ', { continued: true }).font('Helvetica').text(details.tvLounge ? 'Included' : 'None');
-                if (details.carPorch !== undefined) doc.font('Helvetica-Bold').text('Car Porch: ', { continued: true }).font('Helvetica').text(details.carPorch ? 'Included' : 'None');
-                if (details.basement !== undefined) doc.font('Helvetica-Bold').text('Basement: ', { continued: true }).font('Helvetica').text(details.basement ? 'Included' : 'None');
-                if (details.materialQuality) doc.font('Helvetica-Bold').text('Material Quality: ', { continued: true }).font('Helvetica').text(String(details.materialQuality));
-                if (details.timeline) doc.font('Helvetica-Bold').text('Estimated Duration: ', { continued: true }).font('Helvetica').text(`${details.timeline} months`);
-                doc.moveDown(1);
+                const estPairs = [];
+                for (let i = 0; i < estItems.length; i += 2) {
+                    estPairs.push([ estItems[i], estItems[i+1] ]);
+                }
+                drawGridRows(estPairs);
+                doc.moveDown(0.6);
             }
 
             // --- COST & QUOTATION SUMMARY ---
-            doc.fillColor('#0073E6').fontSize(12).font('Helvetica-Bold').text('COST & QUOTATION SUMMARY');
-            doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#E2E8F0').lineWidth(1).stroke();
-            doc.moveDown(0.5);
+            drawSectionHeader('Cost & Quotation Summary');
+            const costItems = [
+                { label: 'Estimated Construction Cost', value: formatPkr(quote.estimatedCost) }
+            ];
+            if (details && details.costPerSqFt) costItems.push({ label: 'Cost per Sq. Ft.', value: formatPkr(details.costPerSqFt) });
+            if (details && details.labourCost) costItems.push({ label: 'Labour Cost', value: formatPkr(details.labourCost) });
+            if (details && details.companyFee) costItems.push({ label: 'Company Supervision Fee', value: formatPkr(details.companyFee) });
+            if (details && details.engineeringCost) costItems.push({ label: 'Engineering & Architecture Cost', value: formatPkr(details.engineeringCost) });
 
-            doc.fillColor('#333333').fontSize(10);
-            doc.font('Helvetica-Bold').text('Estimated Construction Cost: ', { continued: true }).font('Helvetica').text(formatPkr(quote.estimatedCost));
-
-            if (details && details.costPerSqFt) {
-                doc.font('Helvetica-Bold').text('Cost per Sq. Ft.: ', { continued: true }).font('Helvetica').text(formatPkr(details.costPerSqFt));
+            const costPairs = [];
+            for (let i = 0; i < costItems.length; i += 2) {
+                costPairs.push([ costItems[i], costItems[i+1] ]);
             }
-            if (details && details.labourCost) {
-                doc.font('Helvetica-Bold').text('Labour Cost: ', { continued: true }).font('Helvetica').text(formatPkr(details.labourCost));
-            }
-            if (details && details.companyFee) {
-                doc.font('Helvetica-Bold').text('Company Supervision Fee: ', { continued: true }).font('Helvetica').text(formatPkr(details.companyFee));
-            }
-            if (details && details.engineeringCost) {
-                doc.font('Helvetica-Bold').text('Engineering & Architecture Cost: ', { continued: true }).font('Helvetica').text(formatPkr(details.engineeringCost));
-            }
-
-            doc.moveDown(0.8);
+            drawGridRows(costPairs);
+            doc.moveDown(0.6);
 
             // Highlight Box for NOVINKA Quoted Amount
-            const quotedText = quote.quotedAmount !== null && quote.quotedAmount !== undefined
+            const quotedText = quote.quotedAmount !== null && quote.quotedAmount !== undefined && quote.quotedAmount !== 0
                 ? formatPkr(quote.quotedAmount)
                 : 'Quotation amount not yet finalized.';
 
-            doc.rect(40, doc.y, 515, 34).fillAndStroke('#F8FAFC', '#0073E6');
-            doc.fillColor('#1A3A5C').fontSize(11).font('Helvetica-Bold').text(`NOVINKA QUOTED AMOUNT:  ${quotedText}`, 50, doc.y - 24);
-            doc.moveDown(1.5);
+            const boxTitle = 'OFFICIAL NOVINKA QUOTED AMOUNT';
+            const boxPadding = 10;
+            const boxWidth = contentWidth;
 
-            // Customer Requirements (if present)
-            if (quote.message) {
-                doc.fillColor('#0073E6').fontSize(11).font('Helvetica-Bold').text('CUSTOMER REQUIREMENTS / NOTES');
-                doc.fillColor('#555555').fontSize(9).font('Helvetica').text(quote.message);
-                doc.moveDown(1);
+            doc.font('Helvetica-Bold').fontSize(12);
+            const amountTextHeight = doc.heightOfString(quotedText, { width: boxWidth - (boxPadding * 2) });
+            const totalBoxHeight = 18 + amountTextHeight + (boxPadding * 2);
+
+            checkPageBreak(totalBoxHeight + 10);
+
+            const boxY = doc.y;
+            doc.rect(startX, boxY, boxWidth, totalBoxHeight).fillAndStroke('#F0F7FF', '#0073E6');
+
+            doc.fillColor('#0073E6').fontSize(9.5).font('Helvetica-Bold').text(boxTitle, startX + boxPadding, boxY + boxPadding);
+            doc.fillColor('#1A3A5C').fontSize(13).font('Helvetica-Bold').text(quotedText, startX + boxPadding, boxY + boxPadding + 14, {
+                width: boxWidth - (boxPadding * 2)
+            });
+
+            doc.y = boxY + totalBoxHeight + 12;
+
+            // Customer Requirements (only if present in quote.message)
+            if (quote.message && quote.message.trim().length > 0) {
+                const reqText = quote.message.trim();
+                doc.font('Helvetica').fontSize(9);
+                const reqTextHeight = doc.heightOfString(reqText, { width: boxWidth - 24 });
+                const reqBoxHeight = reqTextHeight + 20;
+
+                checkPageBreak(reqBoxHeight + 30);
+
+                drawSectionHeader('Customer Requirements / Notes');
+
+                const reqY = doc.y;
+                doc.rect(startX, reqY, boxWidth, reqBoxHeight).fillAndStroke('#F8FAFC', '#CBD5E1');
+                doc.fillColor('#475569').fontSize(9).font('Helvetica').text(reqText, startX + 12, reqY + 10, {
+                    width: boxWidth - 24
+                });
+
+                doc.y = reqY + reqBoxHeight + 12;
             }
 
-            // --- FOOTER & DISCLAIMER ---
-            doc.moveTo(40, 770).lineTo(555, 770).strokeColor('#E2E8F0').lineWidth(1).stroke();
-            doc.fillColor('#888888').fontSize(8).font('Helvetica').text(
-                'This quotation is generated electronically by NOVINKA Constructions. For inquiries contact support@novinkaconstructions.com',
-                40, 778, { align: 'center' }
-            );
+            // --- FOOTER & DISCLAIMER ON ALL PAGES ---
+            const range = doc.bufferedPageRange();
+            for (let i = range.start; i < range.start + range.count; i++) {
+                doc.switchToPage(i);
+                doc.page.margins.bottom = 0;
+
+                doc.moveTo(startX, 785).lineTo(startX + contentWidth, 785).strokeColor('#CBD5E1').lineWidth(1).stroke();
+                doc.fillColor('#64748B').fontSize(8).font('Helvetica').text(
+                    'This quotation is generated electronically by NOVINKA Constructions. For inquiries contact support@novinkaconstructions.com',
+                    startX, 792, { width: contentWidth, align: 'center', lineBreak: false }
+                );
+                doc.fillColor('#94A3B8').fontSize(8).font('Helvetica').text(
+                    `Page ${i + 1} of ${range.count}`,
+                    startX, 804, { width: contentWidth, align: 'center', lineBreak: false }
+                );
+            }
 
             doc.end();
         } catch (err) {
