@@ -151,15 +151,43 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // ============================================
+// GET UNREAD COUNT
+// ============================================
+router.get('/count', authMiddleware, async (req, res) => {
+    try {
+        const count = await prisma.message.count({
+            where: {
+                status: 'UNREAD'
+            }
+        });
+
+        res.status(200).json({
+            status: 'success',
+            data: { count }
+        });
+    } catch (error) {
+        console.error('Failed to get unread message count:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to get unread message count',
+            error: error.message || String(error)
+        });
+    }
+});
+
+// ============================================
 // GET SINGLE MESSAGE
 // ============================================
 router.get('/:id', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
+        const adminId = req.user?.id;
+        console.log('[MESSAGES DEBUG] GET single message request for ID:', id, 'by admin ID:', adminId);
 
         const message = await prisma.message.findUnique({
             where: { id }
         });
+        console.log('[MESSAGES DEBUG] Fetched message:', message);
 
         if (!message) {
             return res.status(404).json({
@@ -170,10 +198,26 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
         // Auto-mark as read if UNREAD
         if (message.status === 'UNREAD') {
-            await prisma.message.update({
+            const updatedMessage = await prisma.message.update({
                 where: { id },
                 data: { status: 'READ' }
             });
+            console.log('[MESSAGES DEBUG] Auto-updated message status to READ:', updatedMessage);
+
+            // Sync notification as read
+            const notifUpdateResult = await prisma.notification.updateMany({
+                where: {
+                    userId: adminId,
+                    type: 'MESSAGE',
+                    isRead: false,
+                    title: {
+                        contains: `${message.name} sent a new enquiry regarding "${message.subject}"`
+                    }
+                },
+                data: { isRead: true }
+            });
+            console.log('[NOTIFICATIONS DEBUG] Notification update result for auto-read sync:', notifUpdateResult);
+
             message.status = 'READ';
         }
 
@@ -182,7 +226,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
             data: { message }
         });
     } catch (error) {
-        console.error('Failed to fetch message:', error);
+        console.error('[MESSAGES DEBUG] Failed to fetch message:', error);
         res.status(500).json({
             status: 'error',
             message: 'Failed to fetch message'
@@ -237,12 +281,16 @@ router.put('/:id', authMiddleware, async (req, res) => {
 router.patch('/:id/read', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
+        const adminId = req.user?.id;
+        console.log('[MESSAGES DEBUG] Mark READ request for message ID:', id, 'by admin ID:', adminId);
 
         const message = await prisma.message.findUnique({
             where: { id }
         });
+        console.log('[MESSAGES DEBUG] Fetched message before update:', message);
 
         if (!message) {
+            console.log('[SYNC DEBUG] Message not found, aborting sync.');
             return res.status(404).json({
                 status: 'error',
                 message: 'Message not found'
@@ -253,6 +301,22 @@ router.patch('/:id/read', authMiddleware, async (req, res) => {
             where: { id },
             data: { status: 'READ' }
         });
+        console.log('[MESSAGES DEBUG] Updated message status to READ:', updatedMessage);
+
+        // Synchronize notifications: mark related MESSAGE notifications as read for this admin
+        const notifUpdateResult = await prisma.notification.updateMany({
+            where: {
+                userId: adminId,
+                type: 'MESSAGE',
+                isRead: false,
+                // Attempt to match title containing the sender name and subject for specificity
+                title: {
+                    contains: `${message.name} sent a new enquiry regarding "${message.subject}"`
+                }
+            },
+            data: { isRead: true }
+        });
+        console.log('[NOTIFICATIONS DEBUG] Notification update result for READ sync:', notifUpdateResult);
 
         res.status(200).json({
             status: 'success',
@@ -260,7 +324,7 @@ router.patch('/:id/read', authMiddleware, async (req, res) => {
             message: 'Message marked as read'
         });
     } catch (error) {
-        console.error('Failed to mark message as read:', error);
+        console.error('[MESSAGES DEBUG] Failed to mark message as read:', error);
         res.status(500).json({
             status: 'error',
             message: 'Failed to mark message as read'
@@ -274,12 +338,16 @@ router.patch('/:id/read', authMiddleware, async (req, res) => {
 router.patch('/:id/unread', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
+        const adminId = req.user?.id;
+        console.log('[MESSAGES DEBUG] Mark UNREAD request for message ID:', id, 'by admin ID:', adminId);
 
         const message = await prisma.message.findUnique({
             where: { id }
         });
+        console.log('[MESSAGES DEBUG] Fetched message before update:', message);
 
         if (!message) {
+            console.log('[SYNC DEBUG] Message not found, aborting sync.');
             return res.status(404).json({
                 status: 'error',
                 message: 'Message not found'
@@ -290,6 +358,21 @@ router.patch('/:id/unread', authMiddleware, async (req, res) => {
             where: { id },
             data: { status: 'UNREAD' }
         });
+        console.log('[MESSAGES DEBUG] Updated message status to UNREAD:', updatedMessage);
+
+        // Synchronize notifications: mark related MESSAGE notifications as UNREAD for this admin
+        const notifUpdateResult = await prisma.notification.updateMany({
+            where: {
+                userId: adminId,
+                type: 'MESSAGE',
+                isRead: true,
+                title: {
+                    contains: `${message.name} sent a new enquiry regarding "${message.subject}"`
+                }
+            },
+            data: { isRead: false }
+        });
+        console.log('[NOTIFICATIONS DEBUG] Notification update result for UNREAD sync:', notifUpdateResult);
 
         res.status(200).json({
             status: 'success',
@@ -297,7 +380,7 @@ router.patch('/:id/unread', authMiddleware, async (req, res) => {
             message: 'Message marked as unread'
         });
     } catch (error) {
-        console.error('Failed to mark message as unread:', error);
+        console.error('[MESSAGES DEBUG] Failed to mark message as unread:', error);
         res.status(500).json({
             status: 'error',
             message: 'Failed to mark message as unread'
@@ -385,17 +468,33 @@ router.patch('/:id/unarchive', authMiddleware, async (req, res) => {
 router.delete('/:id', authMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
+        const adminId = req.user?.id;
+        console.log('[MESSAGES DEBUG] Delete request for message ID:', id, 'by admin ID:', adminId);
 
         const message = await prisma.message.findUnique({
             where: { id }
         });
+        console.log('[MESSAGES DEBUG] Fetched message before deletion:', message);
 
         if (!message) {
+            console.log('[SYNC DEBUG] Message not found, aborting sync.');
             return res.status(404).json({
                 status: 'error',
                 message: 'Message not found'
             });
         }
+
+        // Delete related notifications first
+        const notifDeleteResult = await prisma.notification.deleteMany({
+            where: {
+                userId: adminId,
+                type: 'MESSAGE',
+                title: {
+                    contains: `${message.name} sent a new enquiry regarding "${message.subject}"`
+                }
+            }
+        });
+        console.log('[NOTIFICATIONS DEBUG] Deleted related notifications on message delete:', notifDeleteResult);
 
         await prisma.message.delete({
             where: { id }
@@ -406,7 +505,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
             message: 'Message deleted successfully'
         });
     } catch (error) {
-        console.error('Failed to delete message:', error);
+        console.error('[MESSAGES DEBUG] Failed to delete message:', error);
         res.status(500).json({
             status: 'error',
             message: 'Failed to delete message'
