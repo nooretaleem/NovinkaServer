@@ -21,17 +21,15 @@ app.use(helmet());
 app.use(compression());
 const allowedOrigins = [
     'http://localhost:4200',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500',
     'https://novinka-admin.vercel.app',
     'https://novinkaconstructions.netlify.app',
     'https://novinkaconstructions.com',
     'https://www.novinkaconstructions.com',
     'https://www.novinkaconstructions.netlify.app',
-    'https://novinka-client.vercel.app',
-    'http://localhost:4200',
-    'http://localhost:5500',
-    'http://127.0.0.1:5500'
+    'https://novinka-client.vercel.app'
 ];
-
 // CORS
 app.use(cors({
     origin: function (origin, callback) {
