@@ -148,6 +148,59 @@ router.get('/categories/all', async (req, res) => {
 });
 
 // ============================================
+// GET SINGLE BLOG BY SLUG (Public Route - Increments View Count)
+// ============================================
+router.get('/slug/:slug', async (req, res) => {
+    try {
+        const { slug } = req.params;
+
+        const blog = await prisma.blog.findUnique({
+            where: { slug }
+        });
+
+        if (!blog || !blog.isPublished) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Blog not found'
+            });
+        }
+
+        // Increment view count atomically for published blog
+        const updatedBlog = await prisma.blog.update({
+            where: { id: blog.id },
+            data: {
+                viewCount: { increment: 1 }
+            }
+        });
+
+        let categories = [];
+        try {
+            if (updatedBlog.categories) {
+                categories = typeof updatedBlog.categories === 'string' ? JSON.parse(updatedBlog.categories) : updatedBlog.categories;
+            }
+        } catch (e) {
+            categories = [];
+        }
+
+        const parsedBlog = {
+            ...updatedBlog,
+            categories
+        };
+
+        res.status(200).json({
+            status: 'success',
+            data: { blog: parsedBlog }
+        });
+    } catch (error) {
+        console.error('Failed to fetch blog by slug:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to fetch blog'
+        });
+    }
+});
+
+// ============================================
 // GET SINGLE BLOG BY ID
 // ============================================
 router.get('/:id', async (req, res) => {

@@ -95,9 +95,12 @@ const blogRoutes = require('./src/routes/blog.routes');
 const notificationRoutes = require('./src/routes/notification.routes');
 const quoteRoutes = require('./src/routes/quote.routes');
 const messageRoutes = require('./src/routes/message.routes');
+const sitemapRoutes = require('./src/routes/sitemap.routes');
 
 
 // Use routes
+app.use('/sitemap.xml', sitemapRoutes);
+app.use('/api/sitemap.xml', sitemapRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
