@@ -5,9 +5,7 @@ const bcrypt = require('bcryptjs');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth.middleware');
 const upload = require('../middleware/upload.middleware');
 const uploadToCloudinary = require('../utils/cloudinary-upload');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma');
 
 // ============================================
 // GET ALL USERS (Admin Only)

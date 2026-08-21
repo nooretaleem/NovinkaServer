@@ -1,9 +1,7 @@
 // src/routes/sitemap.routes.js
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma');
 
 const PROD_SITE_URL = 'https://novinkaconstructions.netlify.app';
 

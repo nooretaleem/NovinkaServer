@@ -6,11 +6,10 @@ const morgan = require('morgan');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('./src/config/prisma');
 require('dotenv').config();
 
 const app = express();
-const prisma = new PrismaClient();
 
 // ============================================
 // MIDDLEWARE

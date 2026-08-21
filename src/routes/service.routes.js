@@ -5,9 +5,7 @@ const { authMiddleware } = require('../middleware/auth.middleware');
 const upload = require('../middleware/upload.middleware');
 const uploadToCloudinary = require('../utils/cloudinary-upload');
 const deleteFromCloudinary = require('../utils/cloudinary-delete');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma');
 
 // Helper to extract Cloudinary public_id from secure URL
 const getPublicIdFromUrl = (url) => {

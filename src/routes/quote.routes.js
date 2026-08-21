@@ -1,13 +1,10 @@
-// src/routes/quote.routes.js
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth.middleware');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../config/prisma');
 const PDFDocument = require('pdfkit');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
-
-const prisma = new PrismaClient();
 
 // Helper to format currency in PKR
 function formatPkr(amount) {
@@ -153,6 +150,54 @@ router.post('/', async (req, res) => {
         return res.status(500).json({
             status: 'error',
             message: 'Failed to submit quote request'
+        });
+    }
+});
+
+// ============================================
+// GENERATE LIVE BOQ PDF (Public Endpoint)
+// ============================================
+router.post('/generate-boq-pdf', async (req, res) => {
+    try {
+        const {
+            customerName,
+            email,
+            phone,
+            city,
+            projectType,
+            contractType,
+            plotSize,
+            coveredArea,
+            estimatedCost,
+            estimatorDetails
+        } = req.body || {};
+
+        const boqQuote = {
+            id: 'BOQ-' + Math.floor(100000 + Math.random() * 900000),
+            customerName: (customerName && typeof customerName === 'string' && customerName.trim()) ? customerName.trim() : 'Valued Client',
+            email: (email && typeof email === 'string' && email.trim()) ? email.trim() : 'client@novinka.com',
+            phone: (phone && typeof phone === 'string' && phone.trim()) ? phone.trim() : 'N/A',
+            city: (city && typeof city === 'string' && city.trim()) ? city.trim() : 'Islamabad',
+            projectType: projectType || 'Grey Structure',
+            contractType: contractType || 'With Material (Turnkey)',
+            plotSize: parseFloat(plotSize) || 0,
+            coveredArea: parseFloat(coveredArea) || 0,
+            estimatedCost: parseFloat(estimatedCost) || null,
+            quotedAmount: parseFloat(estimatedCost) || null,
+            estimatorDetails: estimatorDetails || {},
+            createdAt: new Date()
+        };
+
+        const pdfBuffer = await generateQuotePdfBuffer(boqQuote);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="NOVINKA-Bill-of-Quantities.pdf"');
+        return res.status(200).send(pdfBuffer);
+    } catch (error) {
+        console.error('Failed to generate BOQ PDF:', error);
+        return res.status(500).json({
+            status: 'error',
+            message: 'Failed to generate BOQ PDF'
         });
     }
 });
