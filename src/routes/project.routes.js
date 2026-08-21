@@ -9,17 +9,36 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+// Helper function to safely parse gallery fields
+function parseGalleryField(gallery) {
+    if (!gallery) return [];
+    if (Array.isArray(gallery)) return gallery;
+    if (typeof gallery === 'string') {
+        try {
+            const parsed = JSON.parse(gallery);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+    return [];
+}
+
 // Get all projects
 router.get('/', async (req, res) => {
     try {
         const projects = await prisma.project.findMany({
-            orderBy: { createdAt: 'desc' }
+            orderBy: [
+                { isFeatured: 'desc' },
+                { displayOrder: 'asc' },
+                { createdAt: 'desc' }
+            ]
         });
 
-        // Parse JSON fields
+        // Safely parse gallery fields
         const parsedProjects = projects.map(project => ({
             ...project,
-            gallery: project.gallery ? JSON.parse(project.gallery) : []
+            gallery: parseGalleryField(project.gallery)
         }));
 
         res.status(200).json({
@@ -27,6 +46,7 @@ router.get('/', async (req, res) => {
             data: { projects: parsedProjects }
         });
     } catch (error) {
+        console.error('[PROJECTS API ERROR]', error);
         res.status(500).json({
             status: 'error',
             message: 'Failed to fetch projects'
@@ -50,10 +70,10 @@ router.get('/:id', async (req, res) => {
             });
         }
 
-        // Parse JSON fields
+        // Safely parse gallery fields
         const parsedProject = {
             ...project,
-            gallery: project.gallery ? JSON.parse(project.gallery) : []
+            gallery: parseGalleryField(project.gallery)
         };
 
         res.status(200).json({
