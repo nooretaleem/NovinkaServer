@@ -347,3 +347,25 @@ enum InventoryStatus {
   SOLD
   UNAVAILABLE
 }
+
+model Employee {
+  id              String    @id @default(cuid())
+
+  name            String
+  slug            String    @unique
+
+  designation     String
+  shortBio        String?   @db.Text
+
+  image           String?
+  imagePublicId   String?
+
+  isActive        Boolean   @default(true)
+  displayOrder    Int       @default(0)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([isActive])
+  @@index([displayOrder])
+}
