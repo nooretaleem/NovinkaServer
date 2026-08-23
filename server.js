@@ -94,6 +94,7 @@ const blogRoutes = require('./src/routes/blog.routes');
 const notificationRoutes = require('./src/routes/notification.routes');
 const quoteRoutes = require('./src/routes/quote.routes');
 const messageRoutes = require('./src/routes/message.routes');
+const inventoryRoutes = require('./src/routes/inventory.routes');
 const sitemapRoutes = require('./src/routes/sitemap.routes');
 
 
@@ -104,6 +105,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/services', serviceRoutes);
+app.use('/api/inventory', inventoryRoutes);
 app.use('/api', dashboardRoutes);
 //app.use('/api/categories', categoryRoutes);
 app.use('/api/blogs', blogRoutes);

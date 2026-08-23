@@ -89,7 +89,7 @@ model Blog {
   title         String
   slug          String   @unique
   excerpt       String?
-  content       String
+  content       String   @db.LongText
   featuredImage String? @db.Text
   featuredImagePublicId String? @db.VarChar(255)
   categories    Json?    @default("[]")  // FIXED: Use string JSON
@@ -295,4 +295,55 @@ enum NotificationType {
   MESSAGE
   BLOG
   SYSTEM
+}
+
+// ============================================
+// INVENTORY
+// ============================================
+model Inventory {
+  id                  String          @id @default(cuid())
+
+  type                InventoryType
+  title               String
+  slug                String?         @unique
+
+  location            String
+  size                String
+  price               Float?
+
+  status              InventoryStatus @default(AVAILABLE)
+
+  description         String?         @db.Text
+
+  features            Json?           @default("[]")
+
+  coverImage          String?         @db.Text
+  coverImagePublicId  String?         @db.VarChar(255)
+
+  gallery             Json?           @default("[]")
+
+  isFeatured          Boolean         @default(false)
+  displayOrder        Int             @default(0)
+
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([isFeatured])
+  @@index([displayOrder])
+  @@index([createdAt])
+  @@map("inventory")
+}
+
+enum InventoryType {
+  PLOT
+  HOUSE
+}
+
+enum InventoryStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  UNAVAILABLE
 }
