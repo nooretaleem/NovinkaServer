@@ -97,6 +97,7 @@ const messageRoutes = require('./src/routes/message.routes');
 const inventoryRoutes = require('./src/routes/inventory.routes');
 const employeeRoutes = require('./src/routes/employee.routes');
 const sitemapRoutes = require('./src/routes/sitemap.routes');
+const estimatorConfigRoutes = require('./src/routes/estimator-config.routes');
 
 
 // Use routes
@@ -108,6 +109,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/employees', employeeRoutes);
+app.use('/api/estimator-config', estimatorConfigRoutes);
 app.use('/api', dashboardRoutes);
 //app.use('/api/categories', categoryRoutes);
 app.use('/api/blogs', blogRoutes);
