@@ -26,10 +26,10 @@ const allowedOrigins = [
     'http://localhost:5500',
     'http://127.0.0.1:5500',
     'https://novinka-admin.vercel.app',
-    'https://novinkaconstructions.netlify.app',
-    'https://novinkaconstructions.com',
-    'https://www.novinkaconstructions.com',
-    'https://www.novinkaconstructions.netlify.app',
+    'https://novinkaCONSTRUCTIONS.netlify.app',
+    'https://novinkaCONSTRUCTIONS.com',
+    'https://www.novinkaCONSTRUCTIONS.com',
+    'https://www.novinkaCONSTRUCTIONS.netlify.app',
     'https://novinka-client.vercel.app'
 ];
 
@@ -98,6 +98,9 @@ const inventoryRoutes = require('./src/routes/inventory.routes');
 const employeeRoutes = require('./src/routes/employee.routes');
 const sitemapRoutes = require('./src/routes/sitemap.routes');
 const estimatorConfigRoutes = require('./src/routes/estimator-config.routes');
+const uploadRoutes = require('./src/routes/upload.routes');
+const locationRoutes = require('./src/routes/locations.routes');
+const wadanzaVideosRoutes = require('./src/routes/wadanza-videos.routes');
 
 
 // Use routes
@@ -115,7 +118,10 @@ app.use('/api', dashboardRoutes);
 app.use('/api/blogs', blogRoutes);
 app.use('/api/notifications', notificationRoutes.router);
 app.use('/api/quotes', quoteRoutes);
+app.use('/api/uploads', uploadRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/locations', locationRoutes);
+app.use('/api/wadanza-videos', wadanzaVideosRoutes);
 
 app.get('/', (req, res) => {
     res.json({

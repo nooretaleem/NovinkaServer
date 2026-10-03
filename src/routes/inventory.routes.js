@@ -205,13 +205,13 @@ router.get('/:id', async (req, res) => {
  * POST /api/inventory
  * Authenticated Admin/Manager endpoint to create inventory item with Cloudinary image upload & safe rollback
  */
-router.post('/', 
-    authMiddleware, 
-    roleMiddleware(['ADMIN', 'MANAGER']), 
+router.post('/',
+    authMiddleware,
+    roleMiddleware(['ADMIN', 'MANAGER']),
     upload.fields([
         { name: 'coverImage', maxCount: 1 },
         { name: 'gallery', maxCount: 10 }
-    ]), 
+    ]),
     async (req, res) => {
         const newlyUploadedPublicIds = [];
 
@@ -394,13 +394,13 @@ router.post('/',
  * PATCH /api/inventory/:id
  * Authenticated Admin/Manager endpoint for partial updates, safe image replacement, and gallery management
  */
-router.patch('/:id', 
-    authMiddleware, 
-    roleMiddleware(['ADMIN', 'MANAGER']), 
+router.patch('/:id',
+    authMiddleware,
+    roleMiddleware(['ADMIN', 'MANAGER']),
     upload.fields([
         { name: 'coverImage', maxCount: 1 },
         { name: 'gallery', maxCount: 10 }
-    ]), 
+    ]),
     async (req, res) => {
         const newlyUploadedPublicIds = [];
         const oldPublicIdsToDelete = [];
@@ -551,7 +551,7 @@ router.patch('/:id',
             // 2. Gallery Update & Removal Logic
             if (gallery !== undefined || (req.files && req.files.gallery && req.files.gallery.length > 0)) {
                 let currentGallery = parseJsonField(existingItem.gallery, []);
-                let retainedGallery = gallery !== undefined 
+                let retainedGallery = gallery !== undefined
                     ? parseJsonField(gallery, []).map(normalizeGalleryItem).filter(Boolean)
                     : currentGallery;
 

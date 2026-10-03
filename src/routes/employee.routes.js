@@ -213,7 +213,7 @@ router.post(
         } catch (error) {
             // Clean up newly uploaded image if database save fails
             if (uploadedPublicId) {
-                await deleteFromCloudinary(uploadedPublicId).catch(() => {});
+                await deleteFromCloudinary(uploadedPublicId).catch(() => { });
             }
             console.error('Error creating employee:', error);
             res.status(500).json({
@@ -308,7 +308,7 @@ router.put(
                 const uploadResult = await uploadToCloudinary(req.file.buffer, 'employees');
                 imageUrl = uploadResult.secure_url;
                 newlyUploadedPublicId = uploadResult.public_id;
-                
+
                 // Delete old image from Cloudinary if replacing
                 if (existingEmployee.imagePublicId) {
                     await deleteFromCloudinary(existingEmployee.imagePublicId);
@@ -340,7 +340,7 @@ router.put(
         } catch (error) {
             // Clean up newly uploaded image if database save fails
             if (newlyUploadedPublicId) {
-                await deleteFromCloudinary(newlyUploadedPublicId).catch(() => {});
+                await deleteFromCloudinary(newlyUploadedPublicId).catch(() => { });
             }
             console.error('Error updating employee:', error);
             res.status(500).json({

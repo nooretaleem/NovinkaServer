@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../config/prisma');
 
-const PROD_SITE_URL = 'https://novinkaconstructions.netlify.app';
+const PROD_SITE_URL = 'https://novinkaCONSTRUCTIONS.netlify.app';
 
 /**
  * Escapes XML special characters safely

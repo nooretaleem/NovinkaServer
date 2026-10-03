@@ -2,9 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth.middleware');
 const prisma = require('../config/prisma');
-const PDFDocument = require('pdfkit');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const docUpload = require('../middleware/doc-upload.middleware');
+const uploadToCloudinary = require('../utils/cloudinary-upload');
+const PDFDocument = require('pdfkit');
 
 // Helper to format currency in PKR
 function formatPkr(amount) {
@@ -18,13 +20,14 @@ const VALID_STATUSES = ['NEW', 'REVIEWING', 'QUOTED', 'APPROVED', 'REJECTED'];
 // ============================================
 // CREATE QUOTE REQUEST (Public Endpoint)
 // ============================================
-router.post('/', async (req, res) => {
+router.post('/', docUpload.single('attachment'), async (req, res) => {
     try {
         const {
             customerName,
             email,
             phone,
             city,
+            category,
             projectType,
             contractType,
             plotSize,
@@ -87,30 +90,54 @@ router.post('/', async (req, res) => {
 
         // Validation - Optional Estimator Details JSON
         let parsedEstimatorDetails = null;
-        if (estimatorDetails !== undefined && estimatorDetails !== null) {
-            if (typeof estimatorDetails !== 'object' || Array.isArray(estimatorDetails)) {
-                return res.status(400).json({ status: 'error', message: 'Estimator details must be a valid JSON object' });
+        if (estimatorDetails !== undefined && estimatorDetails !== null && estimatorDetails !== '') {
+            try {
+                parsedEstimatorDetails = typeof estimatorDetails === 'string' ? JSON.parse(estimatorDetails) : estimatorDetails;
+                if (typeof parsedEstimatorDetails !== 'object' || Array.isArray(parsedEstimatorDetails)) {
+                    return res.status(400).json({ status: 'error', message: 'Estimator details must be a valid JSON object' });
+                }
+            } catch (e) {
+                return res.status(400).json({ status: 'error', message: 'Invalid estimator details format' });
             }
-            parsedEstimatorDetails = estimatorDetails;
         }
+
+        // Upload Attachment to Cloudinary (if any)
+        let attachmentUrl = null;
+        let attachmentPublicId = null;
+
+        if (req.file) {
+            try {
+                const result = await uploadToCloudinary(req.file, 'novinka/quotes');
+                attachmentUrl = result.secure_url;
+                attachmentPublicId = result.public_id;
+            } catch (err) {
+                console.error('Cloudinary upload error:', err);
+                return res.status(500).json({ status: 'error', message: 'Failed to upload attachment' });
+            }
+        }
+
+        const createData = {
+            customerName: customerName.trim(),
+            email: email.trim().toLowerCase(),
+            phone: phone.trim(),
+            city: city.trim(),
+            projectCategory: category && typeof category === 'string' ? category.trim() : 'Residential',
+            projectType: projectType.trim(),
+            contractType: contractType.trim(),
+            plotSize: numPlotSize,
+            coveredArea: numCoveredArea,
+            estimatedCost: parsedEstimatedCost,
+            estimatorDetails: parsedEstimatorDetails,
+            message: message && typeof message === 'string' && message.trim() ? message.trim() : null,
+            status: 'NEW',
+            attachmentUrl,
+            attachmentPublicId
+        };
 
         // Strict Security / Mass Assignment Control
         // Explicitly create quote with status: 'NEW' and only allowed customer fields
         const newQuote = await prisma.quote.create({
-            data: {
-                customerName: customerName.trim(),
-                email: email.trim().toLowerCase(),
-                phone: phone.trim(),
-                city: city.trim(),
-                projectType: projectType.trim(),
-                contractType: contractType.trim(),
-                plotSize: numPlotSize,
-                coveredArea: numCoveredArea,
-                estimatedCost: parsedEstimatedCost,
-                estimatorDetails: parsedEstimatorDetails,
-                message: message && typeof message === 'string' && message.trim() ? message.trim() : null,
-                status: 'NEW'
-            }
+            data: createData
         });
 
         // Create Admin Notification (Non-blocking)
@@ -410,24 +437,24 @@ function generateQuotePdfBuffer(quote) {
             const quoteDate = quote.createdAt ? new Date(quote.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : new Date().toLocaleDateString('en-US');
 
             drawGridRows([
-                [ { label: 'Quotation Ref', value: `NOV-QUOTE-${id}` }, { label: 'Date', value: quoteDate } ],
-                [ { label: 'Status', value: quote.status || 'NEW' }, { label: 'Currency', value: 'PKR' } ]
+                [{ label: 'Quotation Ref', value: `NOV-QUOTE-${id}` }, { label: 'Date', value: quoteDate }],
+                [{ label: 'Status', value: quote.status || 'NEW' }, { label: 'Currency', value: 'PKR' }]
             ]);
             doc.moveDown(0.6);
 
             // --- CUSTOMER INFORMATION ---
             drawSectionHeader('Customer Information');
             drawGridRows([
-                [ { label: 'Customer Name', value: quote.customerName }, { label: 'Email Address', value: quote.email } ],
-                [ { label: 'Phone Number', value: quote.phone }, { label: 'City / Location', value: quote.city } ]
+                [{ label: 'Customer Name', value: quote.customerName }, { label: 'Email Address', value: quote.email }],
+                [{ label: 'Phone Number', value: quote.phone }, { label: 'City / Location', value: quote.city }]
             ]);
             doc.moveDown(0.6);
 
             // --- PROJECT SPECIFICATIONS ---
             drawSectionHeader('Project Specifications');
             drawGridRows([
-                [ { label: 'Project Type', value: quote.projectType }, { label: 'Contract Type', value: quote.contractType } ],
-                [ { label: 'Plot Size', value: quote.plotSize ? `${quote.plotSize} sq. ft.` : 'N/A' }, { label: 'Covered Area', value: quote.coveredArea ? `${quote.coveredArea} sq. ft.` : 'N/A' } ]
+                [{ label: 'Project Type', value: quote.projectType }, { label: 'Contract Type', value: quote.contractType }],
+                [{ label: 'Plot Size', value: quote.plotSize ? `${quote.plotSize} sq. ft.` : 'N/A' }, { label: 'Covered Area', value: quote.coveredArea ? `${quote.coveredArea} sq. ft.` : 'N/A' }]
             ]);
             doc.moveDown(0.6);
 
@@ -449,7 +476,7 @@ function generateQuotePdfBuffer(quote) {
 
                 const estPairs = [];
                 for (let i = 0; i < estItems.length; i += 2) {
-                    estPairs.push([ estItems[i], estItems[i+1] ]);
+                    estPairs.push([estItems[i], estItems[i + 1]]);
                 }
                 drawGridRows(estPairs);
                 doc.moveDown(0.6);
@@ -467,7 +494,7 @@ function generateQuotePdfBuffer(quote) {
 
             const costPairs = [];
             for (let i = 0; i < costItems.length; i += 2) {
-                costPairs.push([ costItems[i], costItems[i+1] ]);
+                costPairs.push([costItems[i], costItems[i + 1]]);
             }
             drawGridRows(costPairs);
             doc.moveDown(0.6);
@@ -525,7 +552,7 @@ function generateQuotePdfBuffer(quote) {
 
                 doc.moveTo(startX, 785).lineTo(startX + contentWidth, 785).strokeColor('#CBD5E1').lineWidth(1).stroke();
                 doc.fillColor('#64748B').fontSize(8).font('Helvetica').text(
-                    'This quotation is generated electronically by NOVINKA Constructions. For inquiries contact support@novinkaconstructions.com',
+                    'This quotation is generated electronically by NOVINKA CONSTRUCTIONS. For inquiries contact support@novinkaCONSTRUCTIONS.com',
                     startX, 792, { width: contentWidth, align: 'center', lineBreak: false }
                 );
                 doc.fillColor('#94A3B8').fontSize(8).font('Helvetica').text(
@@ -604,10 +631,10 @@ async function sendQuotationEmail(quote, pdfBuffer, token) {
     const viewUrl = `${siteUrl}/quotation.html?token=${token}`;
 
     const mailOptions = {
-        from: process.env.EMAIL_FROM || '"NOVINKA Constructions" <quotes@novinkaconstructions.com>',
+        from: process.env.EMAIL_FROM || '"NOVINKA CONSTRUCTIONS" <quotes@novinkaCONSTRUCTIONS.com>',
         to: quote.email,
         subject: `NOVINKA Construction — Official Quotation (Ref: NOV-QUOTE-${quote.id})`,
-        text: `Dear ${quote.customerName},\n\nThank you for reaching out to NOVINKA Constructions.\n\nWe have prepared your official construction quotation for your project (${quote.projectType || 'Construction Project'}).\n\nTotal Quoted Amount: ${formatPkr(quote.quotedAmount)}\n\nView Your Quotation Online:\n${viewUrl}\n\nPlease find your detailed quotation document attached as a PDF file to this email.\n\nBest Regards,\nNOVINKA Constructions Team`,
+        text: `Dear ${quote.customerName},\n\nThank you for reaching out to NOVINKA CONSTRUCTIONS.\n\nWe have prepared your official construction quotation for your project (${quote.projectType || 'Construction Project'}).\n\nTotal Quoted Amount: ${formatPkr(quote.quotedAmount)}\n\nView Your Quotation Online:\n${viewUrl}\n\nPlease find your detailed quotation document attached as a PDF file to this email.\n\nBest Regards,\nNOVINKA CONSTRUCTIONS Team`,
         html: `
             <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
                 <div style="background-color: #0073E6; padding: 20px; text-align: center; color: #fff;">
@@ -616,7 +643,7 @@ async function sendQuotationEmail(quote, pdfBuffer, token) {
                 </div>
                 <div style="padding: 24px;">
                     <p style="font-size: 16px;">Dear <strong>${quote.customerName}</strong>,</p>
-                    <p>Thank you for reaching out to NOVINKA Constructions. We are pleased to provide your official quotation for <strong>${quote.projectType || 'your construction project'}</strong>.</p>
+                    <p>Thank you for reaching out to NOVINKA CONSTRUCTIONS. We are pleased to provide your official quotation for <strong>${quote.projectType || 'your construction project'}</strong>.</p>
                     <div style="background-color: #f8fafc; border-left: 4px solid #0073E6; padding: 15px; margin: 20px 0; border-radius: 4px;">
                         <p style="margin: 0; font-size: 14px; color: #64748b;">Quoted Amount:</p>
                         <p style="margin: 5px 0 0 0; font-size: 22px; font-weight: bold; color: #1a3a5c;">${formatPkr(quote.quotedAmount)}</p>
@@ -626,7 +653,7 @@ async function sendQuotationEmail(quote, pdfBuffer, token) {
                     </p>
                     <p>Your complete breakdown and scope of work are also attached to this email in PDF format (<strong>NOVINKA-Quotation-${quote.id}.pdf</strong>).</p>
                     <p>If you have any questions, please feel free to reach out to our team.</p>
-                    <p style="margin-top: 30px; font-size: 14px; color: #64748b;">Best Regards,<br><strong style="color: #333;">NOVINKA Constructions Team</strong></p>
+                    <p style="margin-top: 30px; font-size: 14px; color: #64748b;">Best Regards,<br><strong style="color: #333;">NOVINKA CONSTRUCTIONS Team</strong></p>
                 </div>
             </div>
         `,
