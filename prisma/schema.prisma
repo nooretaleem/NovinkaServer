@@ -423,3 +423,35 @@ model WadanzaVideo {
 
   @@map("wadanza_videos")
 }
+// ============================================
+// WADANZA PROJECTS (For Galleries)
+// ============================================
+model WadanzaProject {
+  id           String   @id @default(cuid())
+  projectName  String   @unique // e.g., "wadanza-1", "wadanza-2"
+  title        String
+  description  String?  @db.Text
+  gallery      Json?    @default("[]") // [{ url, publicId, label }]
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("wadanza_projects")
+}
+
+// ============================================
+// WADANZA GALLERY IMAGES
+// ============================================
+model WadanzaGalleryImage {
+  id           String   @id @default(cuid())
+  projectId    String   // 'wadanza-1' | 'wadanza-2'
+  imageUrl     String   @db.Text
+  title        String
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([projectId])
+  @@map("wadanza_gallery_images")
+}

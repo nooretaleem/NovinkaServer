@@ -101,6 +101,7 @@ const estimatorConfigRoutes = require('./src/routes/estimator-config.routes');
 const uploadRoutes = require('./src/routes/upload.routes');
 const locationRoutes = require('./src/routes/locations.routes');
 const wadanzaVideosRoutes = require('./src/routes/wadanza-videos.routes');
+const wadanzaGalleryRoutes = require('./src/routes/wadanza-gallery.routes');
 
 
 // Use routes
@@ -122,6 +123,7 @@ app.use('/api/uploads', uploadRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/wadanza-videos', wadanzaVideosRoutes);
+app.use('/api/wadanza-gallery', wadanzaGalleryRoutes);
 
 app.get('/', (req, res) => {
     res.json({
