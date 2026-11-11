@@ -31,7 +31,8 @@ const allowedOrigins = [
     'https://www.novinkaCONSTRUCTIONS.com',
     'https://www.novinkaCONSTRUCTIONS.netlify.app',
     'https://novinka-client.vercel.app',
-    'https://novinkaconstructions.com'
+    'https://novinkaconstructions.com',
+    'https://novinkacms.novinkaconstructions.com'
 ];
 
 if (process.env.PUBLIC_SITE_URL) {
