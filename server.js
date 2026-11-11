@@ -25,13 +25,18 @@ const allowedOrigins = [
     'http://localhost:4200',
     'http://localhost:5500',
     'http://127.0.0.1:5500',
-    'https://novinka-admin.vercel.app',
-    'https://novinkaCONSTRUCTIONS.netlify.app',
-    'https://novinkaCONSTRUCTIONS.com',
-    'https://www.novinkaCONSTRUCTIONS.com',
-    'https://www.novinkaCONSTRUCTIONS.netlify.app',
-    'https://novinka-client.vercel.app',
+    //'https://novinka-admin.vercel.app',
+    //   'https://novinka-client.vercel.app',
+
+    // Main Production Domain (Lowercase)
     'https://novinkaconstructions.com',
+    'https://www.novinkaconstructions.com',
+
+    // Netlify Deployments (Lowercase)
+    //'https://novinkaconstructions.netlify.app',
+    //'https://www.novinkaconstructions.netlify.app',
+
+    // CMS Admin Panel
     'https://novinkacms.novinkaconstructions.com'
 ];
 
