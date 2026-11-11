@@ -11,32 +11,20 @@ require('dotenv').config();
 
 const app = express();
 
-// ============================================
-// MIDDLEWARE
-// ============================================
+// Trust proxy for Vercel serverless environment
+app.set('trust proxy', 1);
 
-// Security
-app.use(helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
-app.use(compression());
+// ============================================
+// CORS CONFIGURATION (MUST RUN BEFORE ALL OTHER MIDDLEWARE)
+// ============================================
 
 const allowedOrigins = [
     'http://localhost:4200',
     'http://localhost:5500',
     'http://127.0.0.1:5500',
-    //'https://novinka-admin.vercel.app',
-    //   'https://novinka-client.vercel.app',
-
-    // Main Production Domain (Lowercase)
+    'http://localhost:3000',
     'https://novinkaconstructions.com',
     'https://www.novinkaconstructions.com',
-
-    // Netlify Deployments (Lowercase)
-    //'https://novinkaconstructions.netlify.app',
-    //'https://www.novinkaconstructions.netlify.app',
-
-    // CMS Admin Panel
     'https://novinkacms.novinkaconstructions.com'
 ];
 
@@ -49,34 +37,90 @@ if (process.env.FRONTEND_URL) {
     if (frontUrl && !allowedOrigins.includes(frontUrl)) allowedOrigins.push(frontUrl);
 }
 
+// Origin validation helper supporting subdomains and normalized URLs
+function isOriginAllowed(origin) {
+    if (!origin) return true; // Server-to-server, cron, health check
+    const normalized = origin.trim().replace(/\/$/, '').toLowerCase();
+    if (allowedOrigins.map(o => o.toLowerCase()).includes(normalized)) return true;
+
+    try {
+        const url = new URL(normalized);
+        // Allow any subdomain of novinkaconstructions.com over https
+        if (url.protocol === 'https:' && (url.hostname === 'novinkaconstructions.com' || url.hostname.endsWith('.novinkaconstructions.com'))) {
+            return true;
+        }
+        // Allow Vercel preview environments
+        if (url.protocol === 'https:' && url.hostname.endsWith('.vercel.app')) {
+            return true;
+        }
+    } catch (e) {
+        return false;
+    }
+    return false;
+}
+
 const corsOptions = {
     origin: function (origin, callback) {
-        // Allow server-to-server / Postman requests (no Origin header)
-        if (!origin) return callback(null, true);
-
-        if (allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            console.log("Blocked by CORS:", origin); // Add this for debugging
-            callback(new Error('Not allowed by CORS'));
+        if (isOriginAllowed(origin)) {
+            return callback(null, true);
         }
+        console.warn(`[CORS] Blocked request from unauthorized origin: ${origin}`);
+        return callback(new Error(`CORS Policy: Origin ${origin} not allowed.`));
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-    optionsSuccessStatus: 200
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
+    allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+        'Accept',
+        'Origin',
+        'X-CSRF-Token',
+        'Range'
+    ],
+    exposedHeaders: ['Content-Range', 'X-Content-Range', 'Authorization'],
+    maxAge: 86400, // 24 hours preflight cache
+    optionsSuccessStatus: 204
 };
 
-// Handle Preflight explicitly for Vercel
-app.options('*', cors(corsOptions));
+// 1. Fast-path Preflight OPTIONS & CORS headers for Vercel
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && isOriginAllowed(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+    if (req.method === 'OPTIONS') {
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-CSRF-Token, Range');
+        res.setHeader('Access-Control-Max-Age', '86400');
+        return res.status(204).end();
+    }
+    next();
+});
+
+// 2. Standard CORS middleware for all actual requests
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
+// ============================================
+// OTHER MIDDLEWARE
+// ============================================
 
-// Rate Limiting
+// Security headers with cross-origin enabled
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+app.use(compression());
+
+// Rate Limiting (Bypasses OPTIONS so preflight is never blocked)
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100,
-    message: 'Too many requests from this IP, please try again later.'
+    max: 300,
+    skip: (req) => req.method === 'OPTIONS',
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { status: 'error', message: 'Too many requests, please try again later.' }
 });
 app.use('/api', limiter);
 
@@ -157,6 +201,15 @@ app.get('/api/health', (req, res) => {
 // ============================================
 
 app.use((err, req, res, next) => {
+    // Handle CORS Policy Errors gracefully
+    if (err.message && err.message.includes('CORS')) {
+        return res.status(403).json({
+            status: 'error',
+            code: 'CORS_FORBIDDEN',
+            message: err.message
+        });
+    }
+
     console.error('Error:', err.message);
     res.status(err.status || 500).json({
         status: 'error',
