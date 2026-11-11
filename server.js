@@ -54,11 +54,12 @@ const corsOptions = {
         // Allow server-to-server / Postman requests (no Origin header)
         if (!origin) return callback(null, true);
 
-        if (allowedOrigins.includes(origin)) {
-            return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            console.log("Blocked by CORS:", origin); // Add this for debugging
+            callback(new Error('Not allowed by CORS'));
         }
-
-        return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -66,9 +67,10 @@ const corsOptions = {
     optionsSuccessStatus: 200
 };
 
-// CORS Middleware & OPTIONS Preflight
+// Handle Preflight explicitly for Vercel
+app.options('*', cors(corsOptions));
 app.use(cors(corsOptions));
-//app.options('*', cors(corsOptions));
+
 
 // Rate Limiting
 const limiter = rateLimit({
