@@ -101,7 +101,8 @@ app.use((req, res, next) => {
 
 // 2. Standard CORS middleware for all actual requests
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+//app.options('*', cors(corsOptions));
+app.options('/*splat', cors(corsOptions));
 
 // ============================================
 // OTHER MIDDLEWARE
