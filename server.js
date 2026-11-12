@@ -230,13 +230,15 @@ app.use((req, res) => {
 // START SERVER
 // ============================================
 
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📁 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🔗 API URL: http://localhost:${PORT}/api`);
-});
+// Only listen when running locally (not in Vercel Serverless environment)
+if (!process.env.VERCEL) {
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => {
+        console.log(`🚀 Server running on http://localhost:${PORT}`);
+        console.log(`📁 Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`🔗 API URL: http://localhost:${PORT}/api`);
+    });
+}
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
