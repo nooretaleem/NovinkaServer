@@ -76,7 +76,10 @@ const corsOptions = {
         'Accept',
         'Origin',
         'X-CSRF-Token',
-        'Range'
+        'Range',
+        'Cache-Control',
+        'Pragma',
+        'Expires'
     ],
     exposedHeaders: ['Content-Range', 'X-Content-Range', 'Authorization'],
     maxAge: 86400, // 24 hours preflight cache
@@ -88,11 +91,13 @@ app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (origin && isOriginAllowed(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
         res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
     if (req.method === 'OPTIONS') {
+        res.setHeader('Vary', 'Origin');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-CSRF-Token, Range');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-CSRF-Token, Range, Cache-Control, Pragma, Expires');
         res.setHeader('Access-Control-Max-Age', '86400');
         return res.status(204).end();
     }
@@ -101,8 +106,7 @@ app.use((req, res, next) => {
 
 // 2. Standard CORS middleware for all actual requests
 app.use(cors(corsOptions));
-//app.options('*', cors(corsOptions));
-app.options('/*splat', cors(corsOptions));
+app.options('/{*splat}', cors(corsOptions));
 
 // ============================================
 // OTHER MIDDLEWARE
