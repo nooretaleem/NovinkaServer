@@ -10,21 +10,29 @@ const prisma = require('../config/prisma');
 // Helper function to safely parse gallery fields
 function parseGalleryField(gallery) {
     if (!gallery) return [];
-    if (Array.isArray(gallery)) return gallery;
+    let items = gallery;
     if (typeof gallery === 'string') {
         try {
-            const parsed = JSON.parse(gallery);
-            return Array.isArray(parsed) ? parsed : [];
+            items = JSON.parse(gallery);
         } catch (e) {
             return [];
         }
     }
-    return [];
+    if (!Array.isArray(items)) return [];
+    return items.map(item => {
+        if (typeof item === 'string') return item.trim();
+        if (item && typeof item === 'object' && item.url) return String(item.url).trim();
+        return null;
+    }).filter(Boolean);
 }
 
 // Get all projects
 router.get('/', async (req, res) => {
     try {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+
         const projects = await prisma.project.findMany({
             orderBy: [
                 { isFeatured: 'desc' },
@@ -55,6 +63,10 @@ router.get('/', async (req, res) => {
 // Get single project
 router.get('/:id', async (req, res) => {
     try {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+
         const { id } = req.params;
 
         const project = await prisma.project.findUnique({
@@ -87,26 +99,31 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create project
-router.post('/', authMiddleware, upload.single('coverImage'), async (req, res) => {
+router.post('/', authMiddleware, upload.any(), async (req, res) => {
     try {
         const { title, location, projectType, description, gallery, completionDate, isFeatured, displayOrder } = req.body;
         let coverImage = req.body.coverImage || null;
         let coverImagePublicId = null;
 
-        if (req.file) {
-            const result = await uploadToCloudinary(req.file, 'novinka/projects');
+        const coverFile = req.files?.find(f => f.fieldname === 'coverImage');
+        const galleryFiles = req.files?.filter(f => f.fieldname === 'galleryImages' || f.fieldname === 'galleryFiles' || f.fieldname === 'gallery') || [];
+
+        if (coverFile) {
+            const result = await uploadToCloudinary(coverFile, 'novinka/projects');
             coverImage = result.secure_url;
             coverImagePublicId = result.public_id;
         }
 
-        let parsedGallery = gallery;
-        if (typeof gallery === 'string') {
-            try {
-                parsedGallery = JSON.parse(gallery);
-            } catch (e) {
-                parsedGallery = gallery;
-            }
+        let uploadedGalleryUrls = [];
+        if (galleryFiles.length > 0) {
+            const uploadResults = await Promise.all(
+                galleryFiles.map(file => uploadToCloudinary(file, 'novinka/projects/gallery'))
+            );
+            uploadedGalleryUrls = uploadResults.map(r => r.secure_url);
         }
+
+        const existingGalleryUrls = parseGalleryField(gallery);
+        const finalGallery = [...existingGalleryUrls, ...uploadedGalleryUrls];
 
         const project = await prisma.project.create({
             data: {
@@ -116,7 +133,7 @@ router.post('/', authMiddleware, upload.single('coverImage'), async (req, res) =
                 description,
                 coverImage,
                 coverImagePublicId,
-                gallery: parsedGallery ? JSON.stringify(parsedGallery) : null,
+                gallery: finalGallery,
                 completionDate: completionDate ? new Date(completionDate) : null,
                 isFeatured: isFeatured === 'true' || isFeatured === true,
                 displayOrder: displayOrder ? parseInt(displayOrder, 10) : 0
@@ -125,10 +142,16 @@ router.post('/', authMiddleware, upload.single('coverImage'), async (req, res) =
 
         res.status(201).json({
             status: 'success',
-            data: { project },
+            data: {
+                project: {
+                    ...project,
+                    gallery: parseGalleryField(project.gallery)
+                }
+            },
             message: 'Project created successfully'
         });
     } catch (error) {
+        console.error('[CREATE PROJECT ERROR]', error);
         res.status(500).json({
             status: 'error',
             message: error.message || 'Failed to create project'
@@ -137,7 +160,7 @@ router.post('/', authMiddleware, upload.single('coverImage'), async (req, res) =
 });
 
 // Update project
-router.put('/:id', authMiddleware, upload.single('coverImage'), async (req, res) => {
+router.put('/:id', authMiddleware, upload.any(), async (req, res) => {
     try {
         const { id } = req.params;
         const existingProject = await prisma.project.findUnique({
@@ -153,10 +176,13 @@ router.put('/:id', authMiddleware, upload.single('coverImage'), async (req, res)
 
         const { title, location, projectType, description, gallery, completionDate, isFeatured, displayOrder } = req.body;
 
+        const coverFile = req.files?.find(f => f.fieldname === 'coverImage');
+        const galleryFiles = req.files?.filter(f => f.fieldname === 'galleryImages' || f.fieldname === 'galleryFiles' || f.fieldname === 'gallery') || [];
+
         let coverImage = existingProject.coverImage;
         let coverImagePublicId = existingProject.coverImagePublicId;
 
-        if (req.file) {
+        if (coverFile) {
             // Delete previous Cloudinary image using helper if public_id exists
             if (existingProject.coverImagePublicId) {
                 try {
@@ -167,18 +193,33 @@ router.put('/:id', authMiddleware, upload.single('coverImage'), async (req, res)
             }
 
             // Upload new image to Cloudinary using helper
-            const result = await uploadToCloudinary(req.file, 'novinka/projects');
+            const result = await uploadToCloudinary(coverFile, 'novinka/projects');
             coverImage = result.secure_url;
             coverImagePublicId = result.public_id;
+        } else if (req.body.coverImage !== undefined) {
+            coverImage = req.body.coverImage || null;
+            if (!coverImage && existingProject.coverImagePublicId) {
+                try {
+                    await deleteFromCloudinary(existingProject.coverImagePublicId);
+                } catch (err) {
+                    console.error('Failed to delete Cloudinary image on coverImage removal:', err);
+                }
+                coverImagePublicId = null;
+            }
         }
 
-        let parsedGallery = gallery;
-        if (typeof gallery === 'string') {
-            try {
-                parsedGallery = JSON.parse(gallery);
-            } catch (e) {
-                parsedGallery = gallery;
-            }
+        let uploadedGalleryUrls = [];
+        if (galleryFiles.length > 0) {
+            const uploadResults = await Promise.all(
+                galleryFiles.map(file => uploadToCloudinary(file, 'novinka/projects/gallery'))
+            );
+            uploadedGalleryUrls = uploadResults.map(r => r.secure_url);
+        }
+
+        let finalGallery = existingProject.gallery;
+        if (gallery !== undefined || galleryFiles.length > 0) {
+            const retainedUrls = gallery !== undefined ? parseGalleryField(gallery) : parseGalleryField(existingProject.gallery);
+            finalGallery = [...retainedUrls, ...uploadedGalleryUrls];
         }
 
         const project = await prisma.project.update({
@@ -190,7 +231,7 @@ router.put('/:id', authMiddleware, upload.single('coverImage'), async (req, res)
                 description: description || existingProject.description,
                 coverImage,
                 coverImagePublicId,
-                gallery: parsedGallery ? JSON.stringify(parsedGallery) : existingProject.gallery,
+                gallery: finalGallery,
                 completionDate: completionDate ? new Date(completionDate) : existingProject.completionDate,
                 isFeatured: isFeatured !== undefined ? (isFeatured === 'true' || isFeatured === true) : existingProject.isFeatured,
                 displayOrder: displayOrder !== undefined ? parseInt(displayOrder, 10) : existingProject.displayOrder
@@ -199,10 +240,16 @@ router.put('/:id', authMiddleware, upload.single('coverImage'), async (req, res)
 
         res.status(200).json({
             status: 'success',
-            data: { project },
+            data: {
+                project: {
+                    ...project,
+                    gallery: parseGalleryField(project.gallery)
+                }
+            },
             message: 'Project updated successfully'
         });
     } catch (error) {
+        console.error('[UPDATE PROJECT ERROR]', error);
         res.status(500).json({
             status: 'error',
             message: error.message || 'Failed to update project'
